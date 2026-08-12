@@ -1,0 +1,7 @@
+{
+  "cookie": "PASTE_COOKIE_JSON_ARRAY_OR_BROWSER_COOKIE_HERE",
+  "imei": "PASTE_ZALO_IMEI_HERE",
+  "userAgent": "PASTE_THE_SAME_BROWSER_USER_AGENT_HERE",
+  "prefix": "'",
+  "token": ""
+}

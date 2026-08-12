@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SANGDEV ZALO BOT - Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: rgba(22, 29, 47, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      --accent: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --glass-bg: rgba(17, 24, 39, 0.75);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; background-image: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%); background-attachment: fixed; }
+
+    header {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-logo { width: 36px; height: 36px; background: linear-gradient(135deg, #6366f1, #10b981); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem; color: #fff; box-shadow: 0 0 15px var(--primary-glow); }
+    .brand-title { font-size: 1.25rem; font-weight: 700; background: linear-gradient(to right, #fff, #9ca3af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .header-actions { display: flex; align-items: center; gap: 1rem; }
+    .status-badge { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.9rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot.connected { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+    .dot.disconnected { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+
+    .token-input-group { display: flex; align-items: center; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--card-border); border-radius: 8px; padding: 0.2rem 0.5rem; }
+    .token-input-group input { background: transparent; border: none; outline: none; color: #fff; padding: 0.4rem; font-size: 0.85rem; width: 140px; }
+    .btn { background: var(--primary); color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 0.4rem; }
+    .btn:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px var(--primary-glow); }
+    .btn-danger { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.4); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+
+    main { flex: 1; max-width: 1400px; width: 100%; margin: 0 auto; padding: 2rem; display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+    @media (max-width: 1024px) { main { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--card-border); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+    .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; color: #fff; }
+
+    /* Controls & Toggles */
+    .switch-group { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .switch-group:last-child { border-bottom: none; }
+    .switch-label { font-size: 0.9rem; font-weight: 500; }
+    .switch-subtext { font-size: 0.75rem; color: var(--text-muted); }
+    
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 24px; border: 1px solid var(--card-border); }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--primary); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    /* Group Table */
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+    th { padding: 0.75rem 1rem; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--card-border); }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    tr:hover { background: rgba(255,255,255,0.02); }
+
+    /* Admin list & form */
+    .input-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+    .input-row input { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 8px; padding: 0.55rem 0.8rem; color: #fff; outline: none; font-size: 0.85rem; }
+    .input-row input:focus { border-color: var(--primary); }
+
+    .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .tag { background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: #a5b4fc; padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; }
+    .tag .remove-btn { cursor: pointer; color: #fca5a5; font-weight: bold; }
+
+    /* Logs Terminal */
+    .logs-terminal { background: #07090e; border: 1px solid var(--card-border); border-radius: 12px; padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; max-height: 320px; overflow-y: auto; color: #d1d5db; line-height: 1.6; }
+    .log-item { margin-bottom: 0.4rem; word-break: break-all; }
+    .log-time { color: var(--text-dim); margin-right: 0.5rem; }
+    .log-level-info { color: #60a5fa; }
+    .log-level-warn { color: #fbbf24; }
+    .log-level-error { color: #f87171; }
+
+    /* Chat / Message Sender */
+    .chat-section { display: flex; flex-direction: column; gap: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+    textarea, select { background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 8px; padding: 0.6rem; color: #fff; font-size: 0.85rem; outline: none; }
+    textarea:focus, select:focus { border-color: var(--primary); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">S</div>
+      <div class="brand-title">SANGDEV ZALO BOT</div>
+    </div>
+
+    <div class="header-actions">
+      <div class="status-badge">
+        <span class="dot disconnected" id="statusDot"></span>
+        <span id="statusText">Đang kiểm tra...</span>
+      </div>
+
+      <div class="token-input-group">
+        <input type="password" id="authToken" placeholder="DASHBOARD_TOKEN" onchange="saveToken()">
+        <button class="btn" onclick="fetchSnapshot()">Lưu Token</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="left-col">
+      <!-- BOT SYSTEM STATUS & TOGGLE -->
+      <div class="card">
+        <div class="card-title">
+          <span>Hệ Thống & Bật/Tắt Bot</span>
+          <span id="botStatusBadge" style="font-size:0.8rem; font-weight:500; color:var(--text-muted);">Trạng thái hệ thống</span>
+        </div>
+        <div class="switch-group">
+          <div>
+            <div class="switch-label">Kích Hoạt Zalo Bot</div>
+            <div class="switch-subtext">Cho phép bot nhận và xử lý lệnh từ tin nhắn Zalo</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="botEnabledToggle" onchange="toggleBot(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- GROUPS MANAGEMENT -->
+      <div class="card">
+        <div class="card-title">Quản Lý Nhóm & Cấu Hình Bảo Vệ</div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Mã Nhóm (ID)</th>
+                <th>Cho Phép Hoạt Động (Oday)</th>
+                <th>Chào Mừng (Welcome)</th>
+                <th>Chống Spam</th>
+                <th>Chống Link</th>
+              </tr>
+            </thead>
+            <tbody id="groupsTableBody">
+              <tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Đang tải dữ liệu nhóm...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- LOGS MONITOR -->
+      <div class="card">
+        <div class="card-title">
+          <span>Nhật Ký Hoạt Động (System Logs)</span>
+          <button class="btn" style="padding:0.2rem 0.6rem; font-size:0.75rem;" onclick="fetchSnapshot()">Làm Mới</button>
+        </div>
+        <div class="logs-terminal" id="logsTerminal">
+          <div class="log-item"><span class="log-time">[SYSTEM]</span> Đang kết nối tới server dashboard...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-col">
+      <!-- QUICK MESSAGE SENDER -->
+      <div class="card">
+        <div class="card-title">Gửi Tin Nhắn / Ảnh Zalo</div>
+        <div class="chat-section">
+          <div class="form-group">
+            <label>ID Nhóm hoặc Người Nhận</label>
+            <input type="text" id="targetThreadId" class="input-row" style="margin:0;" placeholder="Nhập ID (VD: 894382103...)">
+          </div>
+          <div class="form-group">
+            <label>Nội Dung Tin Nhắn</label>
+            <textarea id="messageContent" rows="3" placeholder="Nhập nội dung tin nhắn..."></textarea>
+          </div>
+          <button class="btn" style="width:100%; justify-content:center;" onclick="sendMessage()">Gửi Tin Nhắn Text</button>
+          
+          <hr style="border:none; border-top:1px solid var(--card-border); margin:0.5rem 0;">
+
+          <div class="form-group">
+            <label>Gửi Ảnh Kèm Chú Thích (Max 10MB)</label>
+            <input type="file" id="imageFileInput" accept="image/jpeg,image/png,image/webp,image/gif" style="font-size:0.8rem; color:var(--text-muted);">
+          </div>
+          <button class="btn" style="width:100%; justify-content:center; background:#059669;" onclick="sendImage()">Gửi Ảnh</button>
+        </div>
+      </div>
+
+      <!-- ADMINS MANAGEMENT -->
+      <div class="card">
+        <div class="card-title">Quản Trị Viên (Admins)</div>
+        <div class="tag-list" id="adminsList">
+          <span style="font-size:0.8rem; color:var(--text-muted);">Đang tải...</span>
+        </div>
+        <div class="input-row">
+          <input type="text" id="newAdminId" placeholder="UID Admin mới...">
+          <button class="btn" onclick="addAdmin()">Thêm</button>
+        </div>
+      </div>
+
+      <!-- RAILINK BROADCAST -->
+      <div class="card">
+        <div class="card-title">Lịch Rải Tin (Railink)</div>
+        <div class="chat-section">
+          <div class="form-group">
+            <label>Nội dung rải tin</label>
+            <textarea id="railinkContent" rows="2" placeholder="Nội dung cần rải..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Thời lượng (VD: 12h, 1d2h)</label>
+            <input type="text" id="railinkDuration" class="input-row" style="margin:0;" placeholder="12h">
+          </div>
+          <div class="form-group">
+            <label>Độ trễ (VD: 3d = 3d3d)</label>
+            <input type="text" id="railinkDelay" class="input-row" style="margin:0;" placeholder="3d">
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn" style="flex:1; justify-content:center;" onclick="startRailink()">Tạo Lịch</button>
+            <button class="btn btn-danger" style="flex:1; justify-content:center;" onclick="stopRailink()">Dừng Lịch</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let token = localStorage.getItem('DASHBOARD_TOKEN') || '';
+    document.getElementById('authToken').value = token;
+
+    function saveToken() {
+      token = document.getElementById('authToken').value.trim();
+      localStorage.setItem('DASHBOARD_TOKEN', token);
+      fetchSnapshot();
+    }
+
+    async function apiRequest(path, options = {}) {
+      options.headers = options.headers || {};
+      if (token) options.headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(path, options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Lỗi không xác định' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function checkHealth() {
+      try {
+        const data = await fetch('/health').then(r => r.json());
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        if (data.zalo) {
+          dot.className = 'dot connected';
+          text.innerText = 'Zalo Online';
+        } else {
+          dot.className = 'dot disconnected';
+          text.innerText = 'Zalo Offline';
+        }
+      } catch (e) {
+        document.getElementById('statusDot').className = 'dot disconnected';
+        document.getElementById('statusText').innerText = 'Server Mất Kết Nối';
+      }
+    }
+
+    async function fetchSnapshot() {
+      checkHealth();
+      try {
+        const data = await apiRequest('/api/snapshot');
+        renderSnapshot(data);
+      } catch (e) {
+        console.error("Snapshot error:", e);
+        document.getElementById('logsTerminal').innerHTML = `<div class="log-item log-level-error">[ERROR] Không thể lấy dữ liệu: ${e.message}. Kiểm tra TOKEN của bạn!</div>`;
+      }
+    }
+
+    function renderSnapshot(data) {
+      // Toggle bot state
+      const enabled = data.settings?.botEnabled !== false;
+      document.getElementById('botEnabledToggle').checked = enabled;
+
+      // Render Groups
+      const tbody = document.getElementById('groupsTableBody');
+      const groups = Object.entries(data.groups || {});
+      if (groups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Chưa có nhóm nào được ghi nhận.</td></tr>';
+      } else {
+        tbody.innerHTML = groups.map(([id, g]) => `
+          <tr>
+            <td style="font-family:monospace;">${id}</td>
+            <td><input type="checkbox" ${g.status ? 'checked' : ''} onchange="updateGroup('${id}', 'status', this.checked)"></td>
+            <td><input type="checkbox" ${g.welcome ? 'checked' : ''} onchange="updateGroup('${id}', 'welcome', this.checked)"></td>
+            <td><input type="checkbox" ${g.antisp ? 'checked' : ''} onchange="updateGroup('${id}', 'antisp', this.checked)"></td>
+            <td><input type="checkbox" ${g.antilink ? 'checked' : ''} onchange="updateGroup('${id}', 'antilink', this.checked)"></td>
+          </tr>
+        `).join('');
+      }
+
+      // Render Admins
+      const adminsDiv = document.getElementById('adminsList');
+      const adminEntries = Object.keys(data.admins || {});
+      if (adminEntries.length === 0) {
+        adminsDiv.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">Chưa có admin nào.</span>';
+      } else {
+        adminsDiv.innerHTML = adminEntries.map(id => `
+          <div class="tag">
+            <span>${id}</span>
+            <span class="remove-btn" onclick="removeAdmin('${id}')">&times;</span>
+          </div>
+        `).join('');
+      }
+
+      // Render Logs
+      const logsTerm = document.getElementById('logsTerminal');
+      const logEntries = data.logs || [];
+      if (logEntries.length === 0) {
+        logsTerm.innerHTML = '<div class="log-item" style="color:var(--text-muted);">Chưa có nhật ký ghi nhận.</div>';
+      } else {
+        logsTerm.innerHTML = logEntries.map(([_, l]) => {
+          const levelClass = l.level === 'error' ? 'log-level-error' : (l.level === 'warn' ? 'log-level-warn' : 'log-level-info');
+          const time = l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : '';
+          return `<div class="log-item"><span class="log-time">[${time}]</span> <span class="${levelClass}">[${(l.level || 'INFO').toUpperCase()}]</span> ${l.message || l.text || JSON.stringify(l)}</div>`;
+        }).join('');
+      }
+    }
+
+    async function toggleBot(enabled) {
+      try {
+        await apiRequest('/api/settings', { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ botEnabled: enabled }) });
+        fetchSnapshot();
+      } catch (e) { alert("Lỗi toggle bot: " + e.message); }
+    }
+
+    async function updateGroup(groupId, field, value) {
+      try {
+        await apiRequest(`/api/groups/${groupId}`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ [field]: value }) });
+      } catch (e) { alert("Lỗi cập nhật nhóm: " + e.message); }
+    }
+
+    async function addAdmin() {
+      const input = document.getElementById('newAdminId');
+      const id = input.value.trim();
+      if (!id) return;
+      try {
+        await apiRequest(`/api/admins/${id}`, { method: 'POST' });
+        input.value = '';
+        fetchSnapshot();
+      } catch (e) { alert("Lỗi thêm admin: " + e.message); }
+    }
+
+    async function removeAdmin(id) {
+      if (!confirm(`Xóa admin ${id}?`)) return;
+      try {
+        await apiRequest(`/api/admins/${id}`, { method: 'DELETE' });
+        fetchSnapshot();
+      } catch (e) { alert("Lỗi xóa admin: " + e.message); }
+    }
+
+    async function sendMessage() {
+      const threadId = document.getElementById('targetThreadId').value.trim();
+      const content = document.getElementById('messageContent').value.trim();
+      if (!threadId || !content) return alert("Vui lòng nhập ID người nhận và nội dung!");
+      try {
+        await apiRequest('/api/messages', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ threadId, content, type: 0 }) });
+        document.getElementById('messageContent').value = '';
+        alert("Đã gửi tin nhắn!");
+      } catch (e) { alert("Lỗi gửi tin nhắn: " + e.message); }
+    }
+
+    async function sendImage() {
+      const threadId = document.getElementById('targetThreadId').value.trim();
+      const fileInput = document.getElementById('imageFileInput');
+      const caption = document.getElementById('messageContent').value.trim();
+      if (!threadId || !fileInput.files[0]) return alert("Vui lòng nhập ID và chọn file ảnh!");
+      const formData = new FormData();
+      formData.append('image', fileInput.files[0]);
+      formData.append('threadId', threadId);
+      formData.append('type', 0);
+      if (caption) formData.append('caption', caption);
+
+      try {
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch('/api/messages/image', { method: 'POST', headers, body: formData });
+        if (!res.ok) throw new Error((await res.json()).error);
+        alert("Đã gửi ảnh thành công!");
+        fileInput.value = '';
+      } catch (e) { alert("Lỗi gửi ảnh: " + e.message); }
+    }
+
+    async function startRailink() {
+      const content = document.getElementById('railinkContent').value.trim();
+      const duration = document.getElementById('railinkDuration').value.trim();
+      const delay = document.getElementById('railinkDelay').value.trim();
+      if (!content || !duration || !delay) return alert("Điền đầy đủ thông tin rải tin!");
+      try {
+        await apiRequest('/api/railink', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ content, duration, delay }) });
+        alert("Đã khởi tạo lịch rải tin!");
+      } catch (e) { alert("Lỗi tạo rải tin: " + e.message); }
+    }
+
+    async function stopRailink() {
+      try {
+        await apiRequest('/api/railink', { method: 'DELETE' });
+        alert("Đã dừng rải tin!");
+      } catch (e) { alert("Lỗi dừng rải tin: " + e.message); }
+    }
+
+    // Initial load & poll every 10s
+    fetchSnapshot();
+    setInterval(fetchSnapshot, 10000);
+  </script>
+</body>
+</html>

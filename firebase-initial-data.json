@@ -1,0 +1,34 @@
+{
+  "users": {
+    "690204159263789998": {
+      "id": "690204159263789998",
+      "username": "Owner",
+      "avatar": "",
+      "isAdmin": true,
+      "warnings": 0,
+      "blacklisted": false
+    }
+  },
+  "groups": {},
+  "admins": {
+    "690204159263789998": {
+      "id": "690204159263789998",
+      "role": "owner",
+      "enabled": true
+    }
+  },
+  "settings": {
+    "botEnabled": true,
+    "prefix": "'",
+    "railink": {
+      "enabled": false
+    }
+  },
+  "warnings": {},
+  "permissions": {
+    "whitelist": {
+      "690204159263789998": true
+    }
+  },
+  "logs": {}
+}
