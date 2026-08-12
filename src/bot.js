@@ -7,6 +7,7 @@ import { clearSpamUser, enforceAntiSpam } from "./modules/antiSpam.js";
 import { executeCommand } from "./modules/command.js";
 import { ImageGenerator } from "./modules/imageGenerator.js";
 import { AutoRailink } from "./modules/autoRailink.js";
+import { GeminiClient } from "./modules/gemini.js";
 import { TaskScheduler } from "./modules/taskScheduler.js";
 import { fetchAvatar } from "./utils/avatar.js";
 
