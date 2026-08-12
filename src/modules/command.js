@@ -10,7 +10,7 @@ const MENU = [
   "'ml <mệnh lệnh> • 'de-ml [số]",
   "ADMIN SYSTEM",
   "'admin add @Tên • 'admin remove @Tên",
-  "'admin list",
+  "'cut admin @Tên • 'admin list",
   "BOT SYSTEM",
   "'boton • 'botoff",
   "GROUP SYSTEM",
@@ -55,6 +55,11 @@ export async function executeCommand(ctx) {
     return true;
   }
   if (command === "admin") return handleAdmin(ctx, args);
+  if (command === "cut") {
+    if (args[0]?.toLowerCase() === "admin") return handleAdmin(ctx, ["remove", ...args.slice(1)]);
+    return handleAdmin(ctx, ["remove", ...args]);
+  }
+  if (command === "cutadmin" || command === "cut-admin") return handleAdmin(ctx, ["remove", ...args]);
   if (["oday", "offday", "welcome", "antisp", "antilink", "offgr", "ongr"].includes(command)) return handleGroup(ctx, command, args);
   if (command === "boton" || command === "botoff") {
     if (!ctx.isOwner) return ctx.reply("TỪ CHỐI", ["Chỉ owner được bật/tắt bot."]);

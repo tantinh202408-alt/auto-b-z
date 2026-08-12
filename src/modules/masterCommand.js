@@ -18,6 +18,36 @@ const MASTER_TOOLS = [
     }
   },
   {
+    name: "remove_admin",
+    description: "Xóa vai trò admin (cắt admin) của thành viên",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        userIds: {
+          type: "ARRAY",
+          items: { type: "STRING" },
+          description: "Danh sách UID thành viên cần xóa vai trò admin"
+        }
+      },
+      required: ["userIds"]
+    }
+  },
+  {
+    name: "add_admin",
+    description: "Thêm vai trò admin cho thành viên",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        userIds: {
+          type: "ARRAY",
+          items: { type: "STRING" },
+          description: "Danh sách UID thành viên cần thêm vai trò admin"
+        }
+      },
+      required: ["userIds"]
+    }
+  },
+  {
     name: "get_weather",
     description: "Lấy dự báo thời tiết cho địa điểm/tỉnh thành",
     parameters: {
@@ -65,6 +95,7 @@ export async function handleMasterCommand(ctx, body) {
       `Cú pháp: ${ctx.prefix}ml <mệnh lệnh yêu cầu>`,
       "Ví dụ:",
       `• ${ctx.prefix}ml kích @Tên - Kích thành viên được tag ra khỏi nhóm`,
+      `• ${ctx.prefix}ml cut admin @Tên - Xóa vai trò admin của thành viên được tag`,
       `• ${ctx.prefix}ml kiểm tra dự báo thời tiết Hà Nội - Báo thời tiết hiện tại`,
       `• ${ctx.prefix}ml kiểm tra dự báo thời tiết hằng ngày - Tự động báo thời tiết mỗi ngày`,
       `• ${ctx.prefix}ml khóa nhóm / mở nhóm - Đóng hoặc mở chat nhóm`,
@@ -99,7 +130,11 @@ export async function handleMasterCommand(ctx, body) {
     // Fallback intent detection nếu AI không tạo functionCall rõ ràng nhưng câu lệnh mang ý định trực tiếp
     const lowerText = commandText.toLowerCase();
     if (!functionCalls.length) {
-      if ((lowerText.includes("kích") || lowerText.includes("kick") || lowerText.includes("xóa")) && mentionUids.length) {
+      if ((lowerText.includes("cắt admin") || lowerText.includes("xóa admin") || lowerText.includes("cut admin")) && mentionUids.length) {
+        functionCalls.push({ name: "remove_admin", args: { userIds: mentionUids } });
+      } else if ((lowerText.includes("thêm admin") || lowerText.includes("add admin")) && mentionUids.length) {
+        functionCalls.push({ name: "add_admin", args: { userIds: mentionUids } });
+      } else if ((lowerText.includes("kích") || lowerText.includes("kick") || lowerText.includes("xóa")) && mentionUids.length) {
         functionCalls.push({ name: "kick_user", args: { userIds: mentionUids, reason: commandText } });
       } else if (lowerText.includes("thời tiết") || lowerText.includes("dự báo")) {
         const isScheduled = lowerText.includes("hằng ngày") || lowerText.includes("mỗi ngày") || lowerText.includes("định kỳ") || lowerText.includes("mỗi giờ");
@@ -134,6 +169,34 @@ export async function handleMasterCommand(ctx, body) {
           for (const uid of targetIds) {
             await ctx.kick(ctx.threadId, uid);
             results.push(`🚫 Đã kích thành viên UID: ${uid} ra khỏi nhóm.`);
+          }
+        }
+      } else if (name === "remove_admin") {
+        if (!ctx.isOwner) {
+          results.push("⚠️ Chỉ Owner mới có quyền xóa admin.");
+        } else {
+          const targetIds = Array.isArray(args.userIds) && args.userIds.length ? args.userIds : mentionUids;
+          if (!targetIds.length) {
+            results.push("⚠️ Không tìm thấy UID thành viên cần xóa admin. Hãy tag @Tên.");
+          } else {
+            for (const uid of targetIds) {
+              await ctx.store.remove(`admins/${uid}`);
+              results.push(`❌ Đã xóa vai trò admin của UID: ${uid}`);
+            }
+          }
+        }
+      } else if (name === "add_admin") {
+        if (!ctx.isOwner) {
+          results.push("⚠️ Chỉ Owner mới có quyền thêm admin.");
+        } else {
+          const targetIds = Array.isArray(args.userIds) && args.userIds.length ? args.userIds : mentionUids;
+          if (!targetIds.length) {
+            results.push("⚠️ Không tìm thấy UID thành viên cần thêm admin. Hãy tag @Tên.");
+          } else {
+            for (const uid of targetIds) {
+              await ctx.store.set(`admins/${uid}`, { id: uid, name: `Admin_${uid}`, addedAt: Date.now(), addedBy: ctx.senderId });
+              results.push(`✅ Đã thêm vai trò admin cho UID: ${uid}`);
+            }
           }
         }
       } else if (name === "get_weather") {

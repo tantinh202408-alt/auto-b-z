@@ -1,5 +1,5 @@
 export class GeminiClient {
-  constructor({ apiKey, model = "gemini-flash-latest", fetchImpl = fetch }) {
+  constructor({ apiKey, model = "gemini-1.5-flash", fetchImpl = fetch }) {
     this.apiKey = apiKey;
     this.model = model;
     this.fetch = fetchImpl;
@@ -7,8 +7,16 @@ export class GeminiClient {
     this.cooldowns = new Map();
   }
 
+  _formatError(error, responseStatus) {
+    const msg = typeof error === "string" ? error : error?.message || `Gemini HTTP ${responseStatus || "Error"}`;
+    if (/invalid authentication credentials|oauth 2|api key not valid|api_key_invalid|unauthorized/i.test(msg)) {
+      return new Error("Khóa GEMINI_API_KEY trong file .env chưa hợp lệ hoặc đã hết hạn. Vui lòng lấy Gemini API Key (dạng AIzaSy...) từ https://aistudio.google.com/ và dán vào file .env.");
+    }
+    return new Error(msg);
+  }
+
   async ask({ prompt, userId, userName, threadId }) {
-    if (!this.apiKey) throw new Error("Chưa cấu hình GEMINI_API_KEY");
+    if (!this.apiKey) throw new Error("Chưa cấu hình GEMINI_API_KEY trong file .env");
     const text = String(prompt || "").trim();
     if (!text) throw new Error("Cú pháp: 'tl nội dung cần hỏi");
     if (text.length > 4_000) throw new Error("Câu hỏi tối đa 4.000 ký tự");
@@ -25,11 +33,12 @@ export class GeminiClient {
       contents,
       generationConfig: { maxOutputTokens: 1200 }
     });
-    const models = [...new Set([this.model, "gemini-2.5-flash", "gemini-1.5-flash"])];
+    const models = [...new Set([this.model, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"])].filter(Boolean);
     let data;
     let lastError;
     for (const model of models) {
-      const response = await this.fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+      const response = await this.fetch(url, {
         method: "POST",
         signal: AbortSignal.timeout(60_000),
         headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
@@ -37,8 +46,9 @@ export class GeminiClient {
       });
       data = await response.json().catch(() => ({}));
       if (response.ok) break;
-      lastError = new Error(data?.error?.message || `Gemini HTTP ${response.status}`);
-      const retryable = [429, 503].includes(response.status) || /high demand|overloaded|temporar/i.test(lastError.message);
+      const rawMsg = data?.error?.message || `Gemini HTTP ${response.status}`;
+      lastError = this._formatError(rawMsg, response.status);
+      const retryable = [429, 503].includes(response.status) || /high demand|overloaded|temporar/i.test(rawMsg);
       if (!retryable) throw lastError;
       data = null;
     }
@@ -51,7 +61,7 @@ export class GeminiClient {
   }
 
   async askMaster({ prompt, userId, userName, threadId, contextInfo = "", tools = [] }) {
-    if (!this.apiKey) throw new Error("Chưa cấu hình GEMINI_API_KEY trong hệ thống.");
+    if (!this.apiKey) throw new Error("Chưa cấu hình GEMINI_API_KEY trong file .env.");
     const text = String(prompt || "").trim();
     if (!text) throw new Error("Vui lòng nhập mệnh lệnh cho AI.");
 
@@ -61,10 +71,12 @@ ${contextInfo ? `THÔNG TIN NGHỮ CẢNH NHÓM/TIN NHẮN:\n${contextInfo}\n` :
 Nhiệm vụ của bạn:
 1. Phân tích mệnh lệnh của Admin.
 2. Nếu mệnh lệnh yêu cầu KÍCH thành viên: Sử dụng công cụ "kick_user". Đảm bảo lấy đúng UID của thành viên được tag hoặc nhắc tới trong ngữ cảnh.
-3. Nếu mệnh lệnh yêu cầu THỜI TIẾT: Sử dụng công cụ "get_weather" để lấy thông tin thời tiết địa điểm đó.
-4. Nếu mệnh lệnh yêu cầu GHI NHỚ MỆNH LỆNH THỜI GIAN / HẸN GIỜ LẶP LẠI (ví dụ: "kiểm tra thời tiết hằng ngày", "mỗi ngày 7h gửi thời tiết", "rải tin nhắn 2 giờ một lần"): Sử dụng công cụ "schedule_task" với khoảng thời gian thích hợp (1440 phút cho hằng ngày, 60 phút cho hằng giờ,...).
-5. Nếu mệnh lệnh yêu cầu KHÓA/MỞ CHAT nhóm: Sử dụng công cụ "set_chat_lock".
-6. Nếu mệnh lệnh khác: Trả lời ngắn gọn, chuyên nghiệp và thực hiện yêu cầu.
+3. Nếu mệnh lệnh yêu cầu XÓA VAI TRÒ ADMIN / CẮT ADMIN: Sử dụng công cụ "remove_admin".
+4. Nếu mệnh lệnh yêu cầu THÊM ADMIN: Sử dụng công cụ "add_admin".
+5. Nếu mệnh lệnh yêu cầu THỜI TIẾT: Sử dụng công cụ "get_weather" để lấy thông tin thời tiết địa điểm đó.
+6. Nếu mệnh lệnh yêu cầu GHI NHỚ MỆNH LỆNH THỜI GIAN / HẸN GIỜ LẶP LẠI (ví dụ: "kiểm tra thời tiết hằng ngày", "mỗi ngày 7h gửi thời tiết", "rải tin nhắn 2 giờ một lần"): Sử dụng công cụ "schedule_task" với khoảng thời gian thích hợp (1440 phút cho hằng ngày, 60 phút cho hằng giờ,...).
+7. Nếu mệnh lệnh yêu cầu KHÓA/MỞ CHAT nhóm: Sử dụng công cụ "set_chat_lock".
+8. Nếu mệnh lệnh khác: Trả lời ngắn gọn, chuyên nghiệp và thực hiện yêu cầu.
 Hãy luôn trả lời bằng tiếng Việt lịch sự, rõ ràng.`;
 
     const requestPayload = {
@@ -78,12 +90,13 @@ Hãy luôn trả lời bằng tiếng Việt lịch sự, rõ ràng.`;
     }
 
     const body = JSON.stringify(requestPayload);
-    const models = [...new Set([this.model, "gemini-2.5-flash", "gemini-1.5-flash"])];
+    const models = [...new Set([this.model, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"])].filter(Boolean);
     let data;
     let lastError;
 
     for (const model of models) {
-      const response = await this.fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+      const response = await this.fetch(url, {
         method: "POST",
         signal: AbortSignal.timeout(60_000),
         headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
@@ -91,8 +104,9 @@ Hãy luôn trả lời bằng tiếng Việt lịch sự, rõ ràng.`;
       });
       data = await response.json().catch(() => ({}));
       if (response.ok) break;
-      lastError = new Error(data?.error?.message || `Gemini HTTP ${response.status}`);
-      const retryable = [429, 503].includes(response.status) || /high demand|overloaded|temporar/i.test(lastError.message);
+      const rawMsg = data?.error?.message || `Gemini HTTP ${response.status}`;
+      lastError = this._formatError(rawMsg, response.status);
+      const retryable = [429, 503].includes(response.status) || /high demand|overloaded|temporar/i.test(rawMsg);
       if (!retryable) throw lastError;
       data = null;
     }

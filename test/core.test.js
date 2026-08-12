@@ -47,6 +47,24 @@ test("admin add lấy UID từ mention thay vì bắt nhập ID", async () => {
   const ctx = { isOwner: true, senderId: "owner", prefix: "'", content, message: { data: { mentions: [{ uid: "123456789", pos, len: "@Nguyễn Văn A".length }] } }, store: { set: async (key, value) => { saved = { key, value }; }, get: async () => ({}) }, reply: async () => true };
   await handleAdmin(ctx, ["add", "@Nguyễn", "Văn", "A"]); assert.equal(saved.key, "admins/123456789"); assert.equal(saved.value.name, "Nguyễn Văn A");
 });
+test("cut admin xóa vai trò admin bằng mention", async () => {
+  let removedKey; const content = "'cut admin @Nguyễn Văn A"; const pos = content.indexOf("@Nguyễn");
+  const ctx = { isOwner: true, senderId: "owner", prefix: "'", content, message: { data: { mentions: [{ uid: "987654321", pos, len: "@Nguyễn Văn A".length }] } }, store: { remove: async (key) => { removedKey = key; } }, reply: async () => true };
+  await handleAdmin(ctx, ["cut", "admin", "@Nguyễn", "Văn", "A"]);
+  assert.equal(removedKey, "admins/987654321");
+});
+test("GeminiClient báo lỗi khóa API rõ ràng khi sai token", async () => {
+  const fakeFetch = async () => ({
+    ok: false,
+    status: 400,
+    json: async () => ({ error: { message: "Request had invalid authentication credentials. Expected OAuth 2 access token..." } })
+  });
+  const client = new GeminiClient({ apiKey: "bad-token", fetchImpl: fakeFetch });
+  await assert.rejects(
+    async () => client.ask({ prompt: "Test", userId: "u", userName: "A", threadId: "t" }),
+    (err) => /Khóa GEMINI_API_KEY trong file \.env chưa hợp lệ/i.test(err.message)
+  );
+});
 test("GeminiClient gửi prompt và đọc câu trả lời", async () => { const fakeFetch = async (_url, options) => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: "Xin chào bạn" }] } }] }), request: JSON.parse(options.body) }); const client = new GeminiClient({ apiKey: "test", fetchImpl: fakeFetch }); assert.equal(await client.ask({ prompt: "Chào", userId: "u", userName: "An", threadId: "g" }), "Xin chào bạn"); });
 test("parseSpamMessage hiểu cú pháp đơn giản", () => { assert.deepEqual(parseSpamMessage("Xin chào mọi người 5"), { content: "Xin chào mọi người", count: 5 }); assert.deepEqual(parseSpamMessage("+Cú pháp cũ+{3}"), { content: "Cú pháp cũ", count: 3 }); assert.equal(parseSpamMessage("Xin chào"), null); assert.equal(parseSpamMessage("Nội dung 0"), null); });
 
