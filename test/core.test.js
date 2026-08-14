@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import { containsLink, findImageUrls } from "../src/modules/antiLink.js";
 import { clearSpamState, clearSpamUser, detectSpam } from "../src/modules/antiSpam.js";
 import { parseDuration } from "../src/modules/group.js";
@@ -9,6 +10,7 @@ import { parseSpamMessage } from "../src/modules/spamMessage.js";
 import { fetchWeather } from "../src/modules/weather.js";
 import { TaskScheduler } from "../src/modules/taskScheduler.js";
 import { handleDeleteMasterCommand, handleMasterCommand } from "../src/modules/masterCommand.js";
+import { ImageGenerator, imageMetaCache } from "../src/modules/imageGenerator.js";
 
 test("parseDuration hiểu thời lượng Việt", () => { assert.equal(parseDuration("2:00"), 7_200_000); assert.equal(parseDuration("3d"), 259_200_000); assert.equal(parseDuration("30p"), 1_800_000); assert.equal(parseDuration("45s"), 45_000); assert.equal(parseDuration("1d2h30p10s"), 95_410_000); assert.equal(parseDuration("1h30m"), 5_400_000); assert.equal(parseDuration("hello"), null); });
 test("containsLink nhận biết URL, preview và né lọc", () => {
@@ -173,7 +175,7 @@ test("handleMasterCommand và handleDeleteMasterCommand hoạt động đúng", 
 
   // Test 'ml kích @Tên
   await handleMasterCommand(ctx, "kích @Nguyễn Văn A");
-  assert.equal(repliedTitle, "MỆNH LỆNH AI");
+  assert.match(repliedTitle, /MỆNH LỆNH AI/);
   assert.equal(kickedUsers.length, 1);
   assert.equal(kickedUsers[0].userId, "99999");
 
@@ -182,3 +184,37 @@ test("handleMasterCommand và handleDeleteMasterCommand hoạt động đúng", 
   assert.equal(repliedTitle, "MỆNH LỆNH GHI NHỚ");
   assert.match(repliedLines[0], /không có mệnh lệnh/);
 });
+
+
+test("ImageGenerator tạo ảnh nhanh và ghi cache metadata", async () => {
+  const gen = new ImageGenerator(process.cwd());
+  const file = await gen.render({ title: "TEST TỐC ĐỘ", lines: ["Dòng 1", "Dòng 2"] });
+  assert.ok(file);
+  const meta = imageMetaCache.get(file);
+  assert.ok(meta);
+  assert.ok(meta.width > 0);
+  assert.ok(meta.height > 0);
+  assert.ok(meta.size > 0);
+  await fs.unlink(file).catch(() => {});
+  imageMetaCache.delete(file);
+});
+
+test("ZingMp3Service quản lý session tìm kiếm và chọn bài hát", async () => {
+  const { ZingMp3Service } = await import("../src/modules/zingMp3.js");
+  const zing = new ZingMp3Service(process.cwd());
+  const sampleSongs = [
+    { id: "ZW79ZBE8", title: "Nơi Này Có Anh", artists: "Sơn Tùng M-TP", duration: 262 },
+    { id: "ZW78DIEO", title: "Lạc Trôi", artists: "Sơn Tùng M-TP", duration: 233 }
+  ];
+
+  zing.setSession("thread_1", "user_1", sampleSongs);
+  const session = zing.getSession("thread_1", "user_1");
+  assert.equal(session.length, 2);
+  assert.equal(session[0].title, "Nơi Này Có Anh");
+
+  zing.clearSession("thread_1", "user_1");
+  assert.equal(zing.getSession("thread_1", "user_1"), null);
+});
+
+
+

@@ -4,4 +4,7 @@ config.json
 service-account.json
 data/
 tmp/
+*.zip
+*.rar
 .DS_Store
+

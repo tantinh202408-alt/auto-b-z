@@ -1,0 +1,12 @@
+# Configuration for cPanel / DirectAdmin / Apache / LiteSpeed Hosting
+RewriteEngine On
+
+# Tự động chuyển hướng HTTPS (SSL Miễn phí)
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Proxy reverse to Node.js App (nếu chạy port tùy chỉnh)
+DirectoryIndex disabled
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]

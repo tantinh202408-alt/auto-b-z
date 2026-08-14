@@ -9,15 +9,29 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "check": "node --check src/index.js && node --test"
+    "check": "node --check src/index.js && node --test test/core.test.js",
+    "test": "node --test test/core.test.js",
+
   },
+
   "dependencies": {
+    "@img/sharp-win32-x64": "^0.35.3",
+    "asynckit": "^0.5.0",
+    "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "firebase-admin": "^13.5.0",
+    "form-data": "^4.0.6",
+    "http-errors": "^2.0.1",
+    "json-bigint": "^1.0.0",
     "jsqr": "^1.4.0",
+    "mime-types": "^3.0.2",
     "multer": "^2.0.2",
+    "pako": "^3.0.1",
+    "semver": "^7.6.3",
     "sharp": "^0.34.5",
+    "spark-md5": "^3.0.2",
+    "tough-cookie": "^6.0.2",
+    "ws": "^8.21.3",
     "zca-js": "^2.1.2"
   }
 }

@@ -5,17 +5,27 @@ import sharp from "sharp";
 import { enforceAntiLink } from "./modules/antiLink.js";
 import { clearSpamUser, enforceAntiSpam } from "./modules/antiSpam.js";
 import { executeCommand } from "./modules/command.js";
-import { ImageGenerator } from "./modules/imageGenerator.js";
+import { ImageGenerator, imageMetaCache } from "./modules/imageGenerator.js";
 import { AutoRailink } from "./modules/autoRailink.js";
 import { GeminiClient } from "./modules/gemini.js";
 import { TaskScheduler } from "./modules/taskScheduler.js";
+import { ZingMp3Service } from "./modules/zingMp3.js";
 import { fetchAvatar } from "./utils/avatar.js";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SangdevBot {
-  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.api = null; this.stopping = false; this.connecting = false; this.reconnectTimer = null; this.stableTimer = null; this.reconnectAttempt = 0; this.groupTimers = new Map(); this.webMessages = []; this.conversationCache = { at: 0, value: [] }; this.images = new ImageGenerator(config.root); this.railink = new AutoRailink({ store, getApi: () => this.api, logger }); this.gemini = new GeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel }); this.scheduler = new TaskScheduler({ store, getApi: () => this.api, logger }); }
-  async start() { await this.railink.restore(); await this.restoreGroupLocks(); this.scheduler.start(); await this.connectWithRetry(); }
+  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.api = null; this.stopping = false; this.connecting = false; this.reconnectTimer = null; this.stableTimer = null; this.reconnectAttempt = 0; this.groupTimers = new Map(); this.webMessages = []; this.conversationCache = { at: 0, value: [] }; this.images = new ImageGenerator(config.root); this.railink = new AutoRailink({ store, getApi: () => this.api, logger }); this.gemini = new GeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel }); this.scheduler = new TaskScheduler({ store, getApi: () => this.api, logger }); this.zing = new ZingMp3Service(config.root); }
+  async start() {
+    const savedApiKey = await this.store.get("settings/geminiApiKey", null);
+    if (savedApiKey) this.gemini.apiKey = savedApiKey;
+    await this.railink.restore();
+    await this.restoreGroupLocks();
+    this.scheduler.start();
+    await this.connectWithRetry();
+  }
+
+
   async connectWithRetry() {
     if (this.stopping || this.connecting || this.api) return;
     this.connecting = true;
@@ -31,7 +41,21 @@ export class SangdevBot {
   }
   async connect() {
     if (!this.config.cookie.length || !this.config.imei || !this.config.userAgent) throw new Error("Thiếu cookie, imei hoặc userAgent trong config.json");
-    const zalo = new Zalo({ selfListen: true, imageMetadataGetter: async (file) => { const data = await fs.readFile(file); const meta = await sharp(data).metadata(); return { width: meta.width, height: meta.height, size: data.length }; } });
+    const zalo = new Zalo({
+      selfListen: true,
+      imageMetadataGetter: async (file) => {
+        const cached = imageMetaCache.get(file);
+        if (cached) return cached;
+        try {
+          const stat = await fs.stat(file);
+          const data = await fs.readFile(file);
+          const meta = await sharp(data).metadata();
+          return { width: meta.width || 900, height: meta.height || 600, size: stat.size };
+        } catch {
+          return { width: 900, height: 600, size: 0 };
+        }
+      }
+    });
     this.api = await zalo.login({ cookie: this.config.cookie, imei: this.config.imei, userAgent: this.config.userAgent });
     this.api.listener.on("connected", () => { this.logger.info("SANGDEV BOT đã kết nối Zalo"); clearTimeout(this.stableTimer); this.stableTimer = setTimeout(() => { this.reconnectAttempt = 0; }, 60_000); });
     this.api.listener.on("message", (message) => this.onMessage(message).catch((e) => this.logger.error("Lỗi xử lý tin nhắn", e)));
@@ -49,7 +73,7 @@ export class SangdevBot {
     // Cho phép owner điều khiển bot bằng chính tài khoản bot, nhưng chỉ với câu lệnh.
     if (message.isSelf && !content.startsWith(this.config.prefix)) return;
     if (content.startsWith(this.config.prefix)) this.logger.info("Đã nhận lệnh Zalo", { command: content.split(/\s+/)[0], senderId, threadId, isSelf: message.isSelf });
-    await this.store.update(`users/${senderId}`, { id: senderId, username: message.data.dName || "", avatar: message.data.avatar || "", lastSeen: Date.now() });
+    await this.store.update(`users/${senderId}`, { id: senderId, username: message.data?.dName || "", avatar: message.data?.avatar || "", lastSeen: Date.now() });
     const isOwner = senderId === this.config.ownerId; const isAdmin = isOwner || Boolean(await this.store.get(`admins/${senderId}`, false));
     const group = isGroup ? await this.store.get(`groups/${threadId}`, {}) : {};
     const ctx = this.makeContext({ message, content, rawContent, senderId, threadId, isGroup, isOwner, isAdmin });
@@ -85,8 +109,13 @@ export class SangdevBot {
       if (!avatar) try { const info = await this.api.getUserInfo(userId, AvatarSize.Large); const user = info?.changed_profiles?.[userId]; avatar = await fetchAvatar(user?.avatar || user?.bgavatar); name = user?.displayName || user?.zaloName || name; if (avatar) avatarSource = "user-profile"; } catch (error) { this.logger.debug("Không lấy được avatar từ hồ sơ", { userId, message: error.message }); }
       if (!avatar) try { const info = await this.api.getGroupInfo(groupId); const group = info?.gridInfoMap?.[groupId]; const current = group?.currentMems?.find((item) => String(item.id) === userId); avatar = await fetchAvatar(current?.avatar || current?.avatar_25); name = current?.dName || current?.zaloName || name; if (avatar) avatarSource = "group-member"; } catch (error) { this.logger.debug("Không lấy được avatar từ nhóm", { userId, groupId, message: error.message }); }
       const file = await this.images.renderWelcome({ name, groupName: event.data?.groupName || "CỘNG ĐỒNG SANGDEV", avatar });
-      try { await this.api.sendMessage({ msg: "", attachments: [file] }, groupId, 1); this.logger.info("Đã chào mừng thành viên mới", { groupId, userId, name, avatarSource, hasAvatar: Boolean(avatar) }); }
-      finally { fs.unlink(file).catch(() => {}); }
+      try {
+        await this.api.sendMessage({ msg: "", attachments: [file] }, groupId, 1);
+        this.logger.info("Đã chào mừng thành viên mới", { groupId, userId, name, avatarSource, hasAvatar: Boolean(avatar) });
+      } finally {
+        imageMetaCache.delete(file);
+        fs.unlink(file).catch(() => {});
+      }
     }
   }
   recordWebMessage(message) { this.webMessages.push(message); if (this.webMessages.length > 500) this.webMessages.splice(0, this.webMessages.length - 500); }
@@ -122,23 +151,121 @@ export class SangdevBot {
   }
   makeContext(base) {
     const bot = this;
-    return { ...base, prefix: this.config.prefix, store: this.store, railink: this.railink, gemini: this.gemini, scheduler: this.scheduler, logger: this.logger,
+    return { ...base, prefix: this.config.prefix, store: this.store, railink: this.railink, gemini: this.gemini, scheduler: this.scheduler, logger: this.logger, zing: bot.zing,
+      api: bot.api,
+      bot,
+
       kick: (groupId, userId) => bot.kick(groupId, userId),
       isPrivileged: async (id) => id === bot.config.ownerId || Boolean(await bot.store.get(`admins/${id}`, false)) || Boolean(await bot.store.get(`permissions/whitelist/${id}`, false)),
-      reply: async (title, lines) => { await bot.safeReact(base.message); let avatar = null; try { const info = await bot.api.getUserInfo(base.senderId); const user = info?.changed_profiles?.[base.senderId] || info?.[base.senderId]; avatar = await fetchAvatar(user?.avatar); } catch { /* Avatar is optional. */ } const file = await bot.images.render({ title, lines, avatar }); try { return await bot.api.sendMessage({ msg: "", attachments: [file] }, base.threadId, base.message.type); } finally { fs.unlink(file).catch(() => {}); } },
-      replyText: async (text) => { await bot.safeReact(base.message); const chunks = String(text).match(/[\s\S]{1,1800}/g) || []; for (const chunk of chunks) await bot.api.sendMessage({ msg: chunk }, base.threadId, base.message.type); },
-      sendRepeatedText: async (text, count) => { await bot.safeReact(base.message); bot.logger.info("Bắt đầu gửi lặp tin nhắn", { threadId: base.threadId, senderId: base.senderId, count }); for (let index = 0; index < count; index++) { await bot.api.sendMessage({ msg: text }, base.threadId, base.message.type); if (index < count - 1) await wait(700); } bot.logger.info("Đã gửi xong tin nhắn lặp", { threadId: base.threadId, count }); },
+      reply: async (title, lines) => {
+        bot.safeReact(base.message);
+        let avatar = null;
+        let avatarUrl = base.message?.data?.avatar || base.message?.data?.avt;
+        if (!avatarUrl && base.senderId) {
+          const cachedUser = await bot.store.get(`users/${base.senderId}`, null);
+          if (cachedUser?.avatar) avatarUrl = cachedUser.avatar;
+        }
+        if (avatarUrl) {
+          avatar = await fetchAvatar(avatarUrl);
+        } else if (base.senderId) {
+          try {
+            const info = await Promise.race([
+              bot.api.getUserInfo(base.senderId),
+              wait(1000).then(() => null)
+            ]);
+            const user = info?.changed_profiles?.[base.senderId] || info?.[base.senderId];
+            if (user?.avatar) avatar = await fetchAvatar(user.avatar);
+          } catch {}
+        }
+        const file = await bot.images.render({ title, lines, avatar });
+        try {
+          return await bot.api.sendMessage({ msg: "", attachments: [file] }, base.threadId, base.message.type);
+        } finally {
+          imageMetaCache.delete(file);
+          fs.unlink(file).catch(() => {});
+        }
+      },
+      replyText: async (text) => { bot.safeReact(base.message); const chunks = String(text).match(/[\s\S]{1,1800}/g) || []; for (const chunk of chunks) await bot.api.sendMessage({ msg: chunk }, base.threadId, base.message.type); },
+      sendRepeatedText: async (text, count) => { bot.safeReact(base.message); bot.logger.info("Bắt đầu gửi lặp tin nhắn", { threadId: base.threadId, senderId: base.senderId, count }); for (let index = 0; index < count; index++) { await bot.api.sendMessage({ msg: text }, base.threadId, base.message.type); if (index < count - 1) await wait(700); } bot.logger.info("Đã gửi xong tin nhắn lặp", { threadId: base.threadId, count }); },
+      sendPrivateMessage: async (userId, text) => { try { await bot.api.sendMessage({ msg: text }, String(userId), 0); return true; } catch (e) { bot.logger.warn("Không gửi được tin nhắn riêng", e); return false; } },
+      pinMessage: (threadId, msgId) => bot.pinMessage(threadId, msgId),
+      unpinMessage: (threadId, msgId) => bot.unpinMessage(threadId, msgId),
+      addUserToGroup: (groupId, userIds) => bot.addUserToGroup(groupId, userIds),
+      addGroupDeputy: (groupId, userIds) => bot.addGroupDeputy(groupId, userIds),
+      removeGroupDeputy: (groupId, userIds) => bot.removeGroupDeputy(groupId, userIds),
+      createPoll: (groupId, question, options) => bot.createPoll(groupId, question, options),
+      leaveGroup: (groupId) => bot.leaveGroup(groupId),
+      tagAll: (threadId, text) => bot.tagAll(threadId, text),
       safeDelete: (message) => bot.safeDelete(message),
-      warnUser: async (reason, detail) => { const warnings = await bot.store.increment(`warnings/${base.threadId}/${base.senderId}/count`); await bot.store.update(`warnings/${base.threadId}/${base.senderId}`, { reason, lastAt: Date.now() }); await bot.store.set(`logs/${Date.now()}_${base.senderId}`, { userId: base.senderId, groupId: base.threadId, reason, action: warnings >= 10 ? "kick" : "warning", time: Date.now() }); if (warnings >= 10) await bot.kick(base.threadId, base.senderId); return bot.makeContext(base).reply("USER WARNING", [detail, `Người dùng: ${base.message.data.dName || base.senderId}`, `Lý do: ${reason}`, `Vi phạm: ${warnings}/10`]); },
+      warnUser: async (reason, detail) => { const warnings = await bot.store.increment(`warnings/${base.threadId}/${base.senderId}/count`); await bot.store.update(`warnings/${base.threadId}/${base.senderId}`, { reason, lastAt: Date.now() }); await bot.store.set(`logs/${Date.now()}_${base.senderId}`, { userId: base.senderId, groupId: base.threadId, reason, action: warnings >= 10 ? "kick" : "warning", time: Date.now() }); if (warnings >= 10) await bot.kick(base.threadId, base.senderId); return bot.makeContext(base).reply("USER WARNING", [detail, `Người dùng: ${base.message.data?.dName || base.senderId}`, `Lý do: ${reason}`, `Vi phạm: ${warnings}/10`]); },
       setGroupChat: (enabled) => bot.setGroupChat(base.threadId, enabled),
+      setGroupSettingsAdvanced: (groupId, settings) => bot.setGroupSettingsAdvanced(groupId, settings),
       scheduleGroupLock: (expire) => bot.scheduleGroupLock(base.threadId, expire)
     };
   }
-  async safeReact(message) { try { await this.api.addReaction({ rType: 0, source: 6, icon: "🤖" }, message); } catch { try { await this.api.addReaction(Reactions.LIKE, message); } catch (e) { this.logger.debug("Không thể react", e); } } }
-  async safeDelete(message) { try { const result = await this.api.deleteMessage({ data: { cliMsgId: message.data.cliMsgId, msgId: message.data.msgId, uidFrom: message.data.uidFrom }, threadId: message.threadId, type: message.type }, false); this.logger.info("Đã xóa tin nhắn cho mọi người", { threadId: message.threadId, msgId: message.data.msgId, status: result?.status }); return true; } catch (e) { this.logger.warn("Không thể xóa tin nhắn cho mọi người; hãy cấp quyền phó nhóm cho bot", e); return false; } }
+  async safeReact(message) {
+    try {
+      const candidates = [
+        Reactions.HEART,
+        Reactions.LIKE,
+        Reactions.HAHA,
+        Reactions.WOW,
+        Reactions.COOL,
+        Reactions.LOVE_YOU,
+        Reactions.ROSE,
+        Reactions.HANDCLAP,
+        Reactions.OK,
+        Reactions.BEER
+      ];
+      const selected = candidates[Math.floor(Math.random() * candidates.length)];
+      await this.api.addReaction(selected, message);
+    } catch (e) {
+      this.logger.debug("Không thể react", e);
+    }
+  }
+
+  async safeDelete(message) { try { const result = await this.api.deleteMessage({ data: { cliMsgId: message.data?.cliMsgId, msgId: message.data?.msgId, uidFrom: message.data?.uidFrom }, threadId: message.threadId, type: message.type }, false); this.logger.info("Đã xóa tin nhắn cho mọi người", { threadId: message.threadId, msgId: message.data?.msgId, status: result?.status }); return true; } catch (e) { this.logger.warn("Không thể xóa tin nhắn cho mọi người; hãy cấp quyền phó nhóm cho bot", e); return false; } }
   async kick(groupId, userId) { try { await this.api.removeUserFromGroup(userId, groupId); } catch (e) { this.logger.warn("Không thể kick thành viên", e); } }
+  async addUserToGroup(groupId, userIds) { try { const ids = Array.isArray(userIds) ? userIds : [userIds]; if (typeof this.api?.addUserToGroup === "function") return await this.api.addUserToGroup(ids, groupId); } catch (e) { this.logger.warn("Không thể thêm thành viên vào nhóm", e); } return false; }
+  async addGroupDeputy(groupId, userIds) { try { const ids = Array.isArray(userIds) ? userIds : [userIds]; if (typeof this.api?.addGroupDeputy === "function") return await this.api.addGroupDeputy(ids, groupId); } catch (e) { this.logger.warn("Không thể thêm phó nhóm", e); } return false; }
+  async removeGroupDeputy(groupId, userIds) { try { const ids = Array.isArray(userIds) ? userIds : [userIds]; if (typeof this.api?.removeGroupDeputy === "function") return await this.api.removeGroupDeputy(ids, groupId); } catch (e) { this.logger.warn("Không thể xóa phó nhóm", e); } return false; }
+  async createPoll(groupId, question, options = ["Đồng ý", "Không đồng ý"]) { try { if (typeof this.api?.createPoll === "function") return await this.api.createPoll({ question, options, expiredTime: 0 }, groupId); } catch (e) { this.logger.warn("Không thể tạo bình chọn", e); } return false; }
+  async leaveGroup(groupId) { try { if (typeof this.api?.leaveGroup === "function") return await this.api.leaveGroup(groupId); } catch (e) { this.logger.warn("Không thể rời nhóm", e); } return false; }
+  async pinMessage(groupId, msgId) { try { if (typeof this.api?.pinMessage === "function") return await this.api.pinMessage(msgId, groupId); } catch (e) { this.logger.warn("Không thể ghim tin nhắn", e); } return false; }
+  async unpinMessage(groupId, msgId) { try { if (typeof this.api?.unpinMessage === "function") return await this.api.unpinMessage(msgId, groupId); } catch (e) { this.logger.warn("Không thể bỏ ghim tin nhắn", e); } return false; }
+  async tagAll(groupId, text = "Thông báo đến mọi người!") {
+    try {
+      const info = await this.api.getGroupInfo(groupId);
+      const members = info?.gridInfoMap?.[groupId]?.currentMems || [];
+      const mentions = members.slice(0, 50).map((m) => ({ uid: String(m.id), pos: 0, len: text.length }));
+      await this.api.sendMessage({ msg: text, mentions }, groupId, 1);
+      return true;
+    } catch (e) {
+      this.logger.warn("Không thể tag all", e);
+      return false;
+    }
+  }
   async setGroupChat(groupId, enabled) { try { if (typeof this.api?.updateGroupSettings === "function") await this.api.updateGroupSettings({ lockSendMsg: !enabled }, groupId); else throw new Error("Phiên bản zca-js không hỗ trợ khóa chat"); await this.store.update(`groups/${groupId}`, { chatEnabled: enabled, expire: null }); } catch (e) { this.logger.warn("Không thể đổi quyền chat nhóm", e); } }
+  async setGroupSettingsAdvanced(groupId, settings = {}) {
+    try {
+      if (typeof this.api?.updateGroupSettings === "function") {
+        const payload = {};
+        if (typeof settings.lockJoinGroup === "boolean") payload.lockJoinGroup = settings.lockJoinGroup;
+        if (typeof settings.lockSeeMsgHistory === "boolean") payload.lockSeeMsgHistory = settings.lockSeeMsgHistory;
+        if (typeof settings.lockCreatePoll === "boolean") payload.lockCreatePoll = settings.lockCreatePoll;
+        if (typeof settings.lockSendSticker === "boolean") payload.lockSendSticker = settings.lockSendSticker;
+        if (typeof settings.lockSendLink === "boolean") payload.lockSendLink = settings.lockSendLink;
+        if (typeof settings.lockSendMsg === "boolean") payload.lockSendMsg = settings.lockSendMsg;
+        await this.api.updateGroupSettings(payload, groupId);
+        return true;
+      }
+    } catch (e) { this.logger.warn("Không thể đổi cài đặt nâng cao nhóm", e); }
+    return false;
+  }
   scheduleGroupLock(groupId, expire) { if (this.groupTimers.has(groupId)) clearTimeout(this.groupTimers.get(groupId)); const delay = Math.max(0, expire - Date.now()); const timer = setTimeout(() => this.setGroupChat(groupId, false), Math.min(delay, 2_147_483_647)); this.groupTimers.set(groupId, timer); }
   async restoreGroupLocks() { const groups = await this.store.get("groups", {}); for (const [groupId, settings] of Object.entries(groups)) if (settings.expire) this.scheduleGroupLock(groupId, settings.expire); }
   stop() { this.stopping = true; clearTimeout(this.reconnectTimer); clearTimeout(this.stableTimer); this.railink.stopTimer(); this.scheduler.stop(); for (const timer of this.groupTimers.values()) clearTimeout(timer); try { this.api?.listener.stop(); } catch {} }
 }
+
+
+

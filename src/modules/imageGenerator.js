@@ -2,7 +2,19 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-const escapeXml = (value) => String(value ?? "").replace(/[<>&'\"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '\"': "&quot;" })[c]);
+function cleanSvgText(text) {
+  if (text === null || text === undefined) return "";
+  const str = typeof text === "object" ? (text.message || text.text || text.content || JSON.stringify(text)) : String(text);
+  return str
+    .replace(/\[object\s+Object\]/gi, "")
+    .replace(/[\uFE00-\uFE0F\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
+
+const escapeXml = (value) =>
+  cleanSvgText(value)
+    .replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c]);
+
 
 function wrap(text, max = 40) {
   return String(text).split(/\s+/).reduce((lines, word) => {
@@ -23,7 +35,7 @@ function themeFor(title, requested) {
 function buildItems(lines, wrapLength = 40) {
   const items = [];
   for (const raw of lines) {
-    const text = String(raw).trim();
+    const text = cleanSvgText(raw);
     if (!text) continue;
     const section = /^[A-ZÀ-Ỹ\s]{3,}$/.test(text) && !text.startsWith("'");
     if (section) items.push({ type: "section", text });
@@ -32,11 +44,37 @@ function buildItems(lines, wrapLength = 40) {
   return items;
 }
 
+
+export const imageMetaCache = new Map();
+
 export class ImageGenerator {
-  constructor(root) { this.dir = path.join(root, "tmp"); }
+  constructor(root) {
+    this.dir = path.join(root, "tmp");
+    fs.mkdir(this.dir, { recursive: true }).catch(() => {});
+    this.cleanOldFiles(60_000).catch(() => {});
+    this.cleanupTimer = setInterval(() => this.cleanOldFiles(), 5 * 60 * 1000);
+    if (typeof this.cleanupTimer.unref === "function") this.cleanupTimer.unref();
+  }
+
+  async cleanOldFiles(maxAgeMs = 5 * 60 * 1000) {
+    try {
+      const files = await fs.readdir(this.dir);
+      const now = Date.now();
+      for (const file of files) {
+        const fullPath = path.join(this.dir, file);
+        try {
+          const stat = await fs.stat(fullPath);
+          if (now - stat.mtimeMs > maxAgeMs) {
+            await fs.unlink(fullPath).catch(() => {});
+            imageMetaCache.delete(fullPath);
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
 
   async render({ title, subtitle = "SANGDEV BOT", lines = [], accent = "#38bdf8", avatar = null }) {
-    await fs.mkdir(this.dir, { recursive: true });
     const theme = themeFor(title, accent);
     const longestLine = Math.max(...lines.map((line) => String(line).length * 21), 0);
     const width = Math.min(1500, Math.max(900, String(title).length * 34 + 360, longestLine + 180));
@@ -65,7 +103,7 @@ export class ImageGenerator {
         <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${theme.accent}"/><stop offset="1" stop-color="${theme.second}"/></linearGradient>
         <radialGradient id="orb"><stop stop-color="${theme.glow}" stop-opacity=".30"/><stop offset="1" stop-color="${theme.glow}" stop-opacity="0"/></radialGradient>
         <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000" flood-opacity=".36"/></filter>
-        <style>.brand{font:850 30px 'Segoe UI',Arial,sans-serif;letter-spacing:3px}.title{font:900 64px 'Segoe UI',Arial,sans-serif}.section{fill:#c4cee0;font:850 25px 'Segoe UI',Arial,sans-serif;letter-spacing:1.8px}.item{font:700 36px 'Segoe UI',Arial,sans-serif}.small{font:650 19px 'Segoe UI',Arial,sans-serif;letter-spacing:.5px}</style>
+        <style>.brand{font:850 30px 'Segoe UI','Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif;letter-spacing:3px}.title{font:900 64px 'Segoe UI','Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif}.section{fill:#c4cee0;font:850 25px 'Segoe UI','Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif;letter-spacing:1.8px}.item{font:700 36px 'Segoe UI','Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif}.small{font:650 19px 'Segoe UI','Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif;letter-spacing:.5px}</style>
       </defs>
       <rect width="${width}" height="${height}" fill="url(#background)"/>
       <circle cx="${width - 70}" cy="-10" r="390" fill="url(#orb)"/><circle cx="40" cy="${height}" r="350" fill="url(#orb)" opacity=".55"/>
@@ -79,12 +117,12 @@ export class ImageGenerator {
       <g transform="translate(74 ${height - 78})"><circle cx="7" cy="-6" r="7" fill="#34d399"/><text x="27" y="0" class="small" fill="#a7b3c8">ONLINE</text><text x="${width - 148}" y="0" text-anchor="end" class="small" fill="#74829b">SANGDEV.ONLINE</text></g>
     </svg>`;
     const file = path.join(this.dir, `reply-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
-    await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(file);
+    const info = await sharp(Buffer.from(svg)).png({ compressionLevel: 4, effort: 3 }).toFile(file);
+    imageMetaCache.set(file, { width: info.width || width, height: info.height || height, size: info.size });
     return file;
   }
 
   async renderWelcome({ name, groupName = "CỘNG ĐỒNG SANGDEV", avatar = null }) {
-    await fs.mkdir(this.dir, { recursive: true });
     const avatarData = avatar ? `data:image/png;base64,${avatar.toString("base64")}` : "";
     const rawName = String(name || "Thành viên mới").slice(0, 42);
     const rawGroup = String(groupName || "CỘNG ĐỒNG SANGDEV").slice(0, 52);
@@ -100,8 +138,9 @@ export class ImageGenerator {
         <linearGradient id="welcomeRing" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#67e8f9"/><stop offset=".5" stop-color="#c4b5fd"/><stop offset="1" stop-color="#f9a8d4"/></linearGradient>
         <radialGradient id="welcomeGlow"><stop stop-color="#a78bfa" stop-opacity=".55"/><stop offset="1" stop-color="#a78bfa" stop-opacity="0"/></radialGradient>
         <filter id="welcomeShadow"><feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#020617" flood-opacity=".5"/></filter>
-        <style>.w{font-family:'Segoe UI',Arial,sans-serif}.caps{font-weight:800;letter-spacing:8px}.name{font-weight:900}.body{font-weight:650}</style>
+        <style>.w{font-family:'Segoe UI','Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',Arial,sans-serif}.caps{font-weight:800;letter-spacing:8px}.name{font-weight:900}.body{font-weight:650}</style>
       </defs>
+
       <rect width="${width}" height="${height}" fill="url(#welcomeBg)"/><circle cx="${center}" cy="330" r="430" fill="url(#welcomeGlow)"/>
       <rect x="30" y="28" width="${width - 60}" height="764" rx="46" fill="#080b24" fill-opacity=".34" stroke="#fff" stroke-opacity=".18" filter="url(#welcomeShadow)"/>
       <text x="${center}" y="82" text-anchor="middle" class="w caps" fill="#a5f3fc" font-size="27">SANGDEV BOT</text>
@@ -114,7 +153,8 @@ export class ImageGenerator {
       <text x="${center}" y="754" text-anchor="middle" class="w body" fill="#bae6fd" font-size="27">${safeGroup}</text>
     </svg>`;
     const file = path.join(this.dir, `welcome-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
-    await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(file);
+    const info = await sharp(Buffer.from(svg)).png({ compressionLevel: 4, effort: 3 }).toFile(file);
+    imageMetaCache.set(file, { width: info.width || width, height: info.height || height, size: info.size });
     return file;
   }
 }

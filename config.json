@@ -1,9 +1,43 @@
 {
-  "cookie": "_zlang=vn; zpsid=L6cH.444838433.36.IDESxZKSQ5OKhkjCEHneLa1l6c81A51b3IXRPJkZ7xZ4_xrWD20bCLySQ5O; zpw_sek=fXEN.444838433.a0.NHamt_an0DTwH8MwUlO6e23KOyjvp2JXOgzec0oGRDLlmMEFRhLopJU6Dv4iopk29lYvrxK7vNLjzphjF9m6e0; __zi-legacy=3000.SSZzejyD6zOgdh2mtnLQWYQN_RAG01ICFjIXe9fEM8WwdUMdbavJY7wOuQpUIb24VPpihJGm.1",
+  "cookie": [
+    {
+      "domain": ".zalo.me",
+      "name": "app.event.zalo.me",
+      "value": "2133166439460416019"
+    },
+    {
+      "domain": ".zalo.me",
+      "name": "__zi",
+      "value": "3000.SSZzejyD6zOgdh2mtnLQWYQN_RAG01ICFjIXe9fEM8WwdUMdbavJY7wOuQpUIb24VPpihJGm.1"
+    },
+    {
+      "domain": ".zalo.me",
+      "name": "__zi-legacy",
+      "value": "3000.SSZzejyD6zOgdh2mtnLQWYQN_RAG01ICFjIXe9fEM8WwdUMdbavJY7wOuQpUIb24VPpihJGm.1"
+    },
+    {
+      "domain": ".zalo.me",
+      "name": "_zlang",
+      "value": "vn"
+    },
+    {
+      "domain": ".zalo.me",
+      "name": "zpsid",
+      "value": "SAcG.444838433.42.BWub1VISgTRLBYhC-9ofre7ls-B0g97bpAYQvVeZtv7RaHxizNDbg9wSgTO"
+    },
+    {
+      "domain": ".chat.zalo.me",
+      "name": "zpw_sek",
+      "value": "e0Oe.444838433.a0.GDzJBKA3ksN1zZu8mKIz4fjcs7d2VfyZsG3OHf8HYsVK0knwqdUDSBCAY3sNUO0mdKe2PAThiANQHKtUdYwz4W"
+    }
+  ],
   "imei": "3f6f481b-4241-42ad-b49c-ed79f08ed642-73c2e21c0fc47f8841aa6000af1e64c7",
-  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
   "prefix": "'",
   "token": "",
   "ownerId": "690204159263789998",
-  "geminiApiKey": "AQ.Ab8RN6JtT_CMqhjAoPRN21LXzvibwmBihj0W2WnJCHjw38F61Q"
+  "geminiApiKey": "AQ.Ab8RN6JtT_CMqhjAoPRN21LXzvibwmBihj0W2WnJCHjw38F61Q",
+  "tursoDatabaseUrl": "libsql://sangdev-sangdev27.aws-ap-northeast-1.turso.io",
+  "tursoAuthToken": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzA0NDk4MzYsImlkIjoiZjYwZjViYjItNzYzMS00NDExLThkNWQtNGVjZTU3MzIxYTdlIiwicmlkIjoiMDgxNTllMmQtZTczNC00YjkwLTliOTItMTM2OTljNTNjNDBiIn0.aJyBN2VbgEwZXYW17aFEbMOCRPxECzod2TxN2pnWzpssHOBBDOF9GQzYAy27y0N-abcHPpypA5oAxEZvAeIVAg",
+  "tursoTable": "sangdev_zalo_bot_data"
 }

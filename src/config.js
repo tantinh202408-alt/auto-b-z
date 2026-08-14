@@ -35,6 +35,9 @@ export async function loadConfig() {
     dashboardToken: process.env.DASHBOARD_TOKEN || "",
     geminiApiKey: process.env.GEMINI_API_KEY || file.geminiApiKey || "",
     geminiModel: process.env.GEMINI_MODEL || file.geminiModel || "gemini-flash-latest",
+    tursoDatabaseUrl: process.env.TURSO_DATABASE_URL || file.tursoDatabaseUrl || file.tursoUrl || "",
+    tursoAuthToken: process.env.TURSO_AUTH_TOKEN || file.tursoAuthToken || file.tursoToken || "",
+    tursoTable: process.env.TURSO_TABLE || file.tursoTable || "sangdev_zalo_bot_data",
     firebaseUrl: process.env.FIREBASE_DATABASE_URL || "",
     serviceAccountPath: path.resolve(ROOT, process.env.FIREBASE_SERVICE_ACCOUNT || "service-account.json"),
     firebaseServiceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || ""
@@ -42,3 +45,4 @@ export async function loadConfig() {
   if (!config.prefix.trim()) throw new Error("Prefix không được để trống");
   return Object.freeze(config);
 }
+
