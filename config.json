@@ -39,5 +39,32 @@
   "geminiApiKey": "AQ.Ab8RN6JtT_CMqhjAoPRN21LXzvibwmBihj0W2WnJCHjw38F61Q",
   "tursoDatabaseUrl": "libsql://sangdev-sangdev27.aws-ap-northeast-1.turso.io",
   "tursoAuthToken": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzA0NDk4MzYsImlkIjoiZjYwZjViYjItNzYzMS00NDExLThkNWQtNGVjZTU3MzIxYTdlIiwicmlkIjoiMDgxNTllMmQtZTczNC00YjkwLTliOTItMTM2OTljNTNjNDBiIn0.aJyBN2VbgEwZXYW17aFEbMOCRPxECzod2TxN2pnWzpssHOBBDOF9GQzYAy27y0N-abcHPpypA5oAxEZvAeIVAg",
-  "tursoTable": "sangdev_zalo_bot_data"
+  "tursoTable": "sangdev_zalo_bot_data",
+  "zingCookie": [
+    {
+      "domain": ".zingmp3.vn",
+      "name": "zmp3_app_version.1",
+      "value": "1201"
+    },
+    {
+      "domain": "zingmp3.vn",
+      "name": "_zabst",
+      "value": "1%2Cd2ViLmFwaS5hZHRpbWFzZXJ2ZXIudm4%3D%2C0%2CzpmLy4SMzMDM2IjLiV2d"
+    },
+    {
+      "domain": "zingmp3.vn",
+      "name": "atmpv",
+      "value": "1"
+    },
+    {
+      "domain": ".zingmp3.vn",
+      "name": "zmp3_rqid",
+      "value": "MHwxNC4xOTEdUngMTE4LjmUsICxfHYxLjIwLjF8MTmUsIC4NjmUsICxNTk3MjIzMA"
+    },
+    {
+      "domain": ".zingmp3.vn",
+      "name": "za_oauth_v4",
+      "value": "30afb2a990e48dda9e9c3e9fa95e27d9a060483d9f543aef7e8f1069e1e54a50"
+    }
+  ]
 }

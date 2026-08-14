@@ -26,6 +26,7 @@ export async function loadConfig() {
   const config = {
     root: ROOT,
     cookie: normalizeCookie(file.cookie || process.env.ZALO_COOKIE),
+    zingCookie: file.zingCookie || process.env.ZING_COOKIE || "",
     imei: file.imei || process.env.ZALO_IMEI || "",
     userAgent: file.userAgent || process.env.ZALO_USER_AGENT || "",
     token: file.token || process.env.ZALO_TOKEN || "",

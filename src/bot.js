@@ -15,7 +15,7 @@ import { fetchAvatar } from "./utils/avatar.js";
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SangdevBot {
-  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.api = null; this.stopping = false; this.connecting = false; this.reconnectTimer = null; this.stableTimer = null; this.reconnectAttempt = 0; this.groupTimers = new Map(); this.webMessages = []; this.conversationCache = { at: 0, value: [] }; this.images = new ImageGenerator(config.root); this.railink = new AutoRailink({ store, getApi: () => this.api, logger }); this.gemini = new GeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel }); this.scheduler = new TaskScheduler({ store, getApi: () => this.api, logger }); this.zing = new ZingMp3Service(config.root); }
+  constructor(config, store, logger) { this.config = config; this.store = store; this.logger = logger; this.api = null; this.stopping = false; this.connecting = false; this.reconnectTimer = null; this.stableTimer = null; this.reconnectAttempt = 0; this.groupTimers = new Map(); this.webMessages = []; this.conversationCache = { at: 0, value: [] }; this.images = new ImageGenerator(config.root); this.railink = new AutoRailink({ store, getApi: () => this.api, logger }); this.gemini = new GeminiClient({ apiKey: config.geminiApiKey, model: config.geminiModel }); this.scheduler = new TaskScheduler({ store, getApi: () => this.api, logger }); this.zing = new ZingMp3Service(config.root, config.zingCookie); }
   async start() {
     const savedApiKey = await this.store.get("settings/geminiApiKey", null);
     if (savedApiKey) this.gemini.apiKey = savedApiKey;

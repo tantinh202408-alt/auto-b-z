@@ -3,5 +3,8 @@
   "imei": "PASTE_ZALO_IMEI_HERE",
   "userAgent": "PASTE_THE_SAME_BROWSER_USER_AGENT_HERE",
   "prefix": "'",
-  "token": ""
+  "token": "",
+  "ownerId": "PASTE_OWNER_ID_HERE",
+  "geminiApiKey": "PASTE_GEMINI_API_KEY_HERE",
+  "zingCookie": "PASTE_ZING_COOKIE_JSON_ARRAY_OR_STRING_HERE"
 }

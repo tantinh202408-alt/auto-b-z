@@ -21,11 +21,45 @@ function formatDuration(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
+export function formatCookieHeader(input) {
+  if (!input) return "";
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return formatCookieHeader(parsed);
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+  if (Array.isArray(input)) {
+    return input
+      .filter((item) => item && item.name && item.value !== undefined)
+      .map((item) => `${item.name}=${item.value}`)
+      .join("; ");
+  }
+  if (typeof input === "object" && input !== null) {
+    if (Array.isArray(input.cookies)) {
+      return formatCookieHeader(input.cookies);
+    }
+  }
+  return "";
+}
+
 export class ZingMp3Service {
-  constructor(root = process.cwd()) {
+  constructor(root = process.cwd(), customCookie = "") {
     this.tmpDir = path.join(root, "tmp");
     this.sessionCache = new Map(); // key: `${threadId}:${senderId}` -> { songs, expireAt }
+    this.customCookie = customCookie;
+    this.lastError = "";
     fs.mkdir(this.tmpDir, { recursive: true }).catch(() => {});
+  }
+
+  setCustomCookie(cookie) {
+    this.customCookie = cookie;
   }
 
   hashHasIdSignature(apiPath, id, ctime) {
@@ -43,6 +77,7 @@ export class ZingMp3Service {
   }
 
   async getCookie() {
+    let baseCookie = "";
     try {
       const response = await fetch(URL_API, {
         headers: {
@@ -50,10 +85,15 @@ export class ZingMp3Service {
         }
       });
       const rawCookies = response.headers.getSetCookie ? response.headers.getSetCookie() : [response.headers.get("set-cookie") || ""];
-      return rawCookies.map((c) => c.split(";")[0]).join("; ");
+      baseCookie = rawCookies.map((c) => c.split(";")[0]).join("; ");
     } catch {
-      return "";
+      baseCookie = "";
     }
+
+    const formattedCustom = formatCookieHeader(this.customCookie);
+    if (!formattedCustom) return baseCookie;
+    if (!baseCookie) return formattedCustom;
+    return `${formattedCustom}; ${baseCookie}`;
   }
 
   async requestZing(apiPath, params = {}) {
@@ -99,6 +139,9 @@ export class ZingMp3Service {
   async getStreamUrl(songId) {
     const res = await this.requestZing("/api/v2/song/get/streaming", { id: songId });
     if (res?.err !== 0 || !res?.data) {
+      if (res?.msg) {
+        this.lastError = res.msg;
+      }
       return null;
     }
     return res.data["128"] || res.data["320"] || null;
@@ -107,7 +150,8 @@ export class ZingMp3Service {
   async downloadSong(songId) {
     const streamUrl = await this.getStreamUrl(songId);
     if (!streamUrl || streamUrl === "VIP") {
-      throw new Error("Bài hát này thuộc bản quyền VIP hoặc không có link phát miễn phí.");
+      const detail = this.lastError ? ` (${this.lastError})` : "";
+      throw new Error(`Bài hát này thuộc bản quyền VIP hoặc Zing MP3 yêu cầu tài khoản/cookie${detail}.`);
     }
 
     const res = await fetch(streamUrl, {
@@ -177,7 +221,6 @@ async function sendSongMusic(ctx, zingService, song) {
 }
 
 export async function handleZingMusic(ctx, args, zingService) {
-
   const rawArg = args.join(" ").trim();
   if (!rawArg) {
     return ctx.reply("ZING MP3 MUSIC", [
@@ -218,8 +261,7 @@ export async function handleZingMusic(ctx, args, zingService) {
       return true;
     } catch (e) {
       return ctx.reply("LỖI PHÁT NHẠC", [
-        `Không thể phát bài "${song.title}": ${e.message}`,
-        "Bài hát có thể yêu cầu tài khoản VIP Zing MP3."
+        `Không thể phát bài "${song.title}": ${e.message}`
       ]);
     }
   }
@@ -253,7 +295,6 @@ export async function handleZingMusic(ctx, args, zingService) {
       return ctx.reply("LỖI PHÁT NHẠC", [`Không thể phát bài "${song.title}": ${e.message}`]);
     }
   }
-
 
   // Lưu session và hiển thị danh sách cho người dùng chọn
   zingService.setSession(ctx.threadId, ctx.senderId, songs);
